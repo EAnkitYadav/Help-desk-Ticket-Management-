@@ -1,0 +1,35 @@
+{
+  "name": "server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "db:generate": "bunx prisma generate",
+    "db:migrate": "bunx prisma migrate dev",
+    "db:migrate:prod": "bunx prisma migrate deploy",
+    "db:seed": "bunx prisma db seed",
+    "db:studio": "bunx prisma studio",
+    "db:push": "bunx prisma db push",
+    "db:reset": "bunx prisma migrate reset"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.10.1",
+    "better-auth": "^1.6.23",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.2",
+    "prisma": "^6.10.1",
+    "typescript": "~6.0.2"
+  },
+  "prisma": {
+    "seed": "bun src/seed.ts"
+  }
+}

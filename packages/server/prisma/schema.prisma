@@ -1,0 +1,186 @@
+// Prisma schema for the AI-Powered Helpdesk Ticket Management System
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User & Auth ────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  AGENT
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  emailVerified Boolean  @default(false) @map("email_verified")
+  image         String?
+  role          Role     @default(AGENT)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  assignedTickets Ticket[]  @relation("AssignedAgent")
+  sessions        Session[]
+  comments        Comment[]
+  accounts        Account[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ─── Tickets ────────────────────────────────────────────────────────────────────
+
+enum TicketStatus {
+  OPEN
+  RESOLVED
+  CLOSED
+}
+
+enum TicketCategory {
+  GENERAL_QUESTION
+  TECHNICAL_QUESTION
+  REFUND_REQUEST
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Ticket {
+  id          String         @id @default(cuid())
+  subject     String
+  description String
+  status      TicketStatus   @default(OPEN)
+  category    TicketCategory @default(GENERAL_QUESTION)
+  priority    TicketPriority @default(MEDIUM)
+
+  // Sender info (from email or manual creation)
+  senderName  String @map("sender_name")
+  senderEmail String @map("sender_email")
+
+  // AI-generated fields
+  aiSummary  String?         @map("ai_summary")
+  aiCategory TicketCategory? @map("ai_category")
+
+  // Assignment
+  assignedToId String? @map("assigned_to_id")
+  assignedTo   User?   @relation("AssignedAgent", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Email threading
+  emailMessageId String? @unique @map("email_message_id")
+  emailThreadId  String? @map("email_thread_id")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  resolvedAt DateTime? @map("resolved_at")
+  closedAt   DateTime? @map("closed_at")
+
+  // Relations
+  comments Comment[]
+
+  @@index([status])
+  @@index([category])
+  @@index([assignedToId])
+  @@index([senderEmail])
+  @@index([createdAt])
+  @@map("tickets")
+}
+
+// ─── Comments / Replies ─────────────────────────────────────────────────────────
+
+model Comment {
+  id            String  @id @default(cuid())
+  body          String
+  isInternal    Boolean @default(false) @map("is_internal")
+  isAiGenerated Boolean @default(false) @map("is_ai_generated")
+
+  // Relations
+  ticketId String @map("ticket_id")
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorId String? @map("author_id")
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([ticketId])
+  @@map("comments")
+}
+
+// ─── Knowledge Base ─────────────────────────────────────────────────────────────
+
+model KnowledgeArticle {
+  id          String         @id @default(cuid())
+  title       String
+  content     String
+  category    TicketCategory
+  isPublished Boolean        @default(true) @map("is_published")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@map("knowledge_articles")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}

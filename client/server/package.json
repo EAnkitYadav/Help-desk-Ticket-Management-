@@ -1,0 +1,17 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir ./dist --target node",
+    "start": "bun dist/index.js",
+    "db:migrate": "bunx prisma migrate dev",
+    "db:seed": "bunx prisma db seed",
+    "db:studio": "bunx prisma studio",
+    "db:generate": "bunx prisma generate"
+  },
+  "prisma": {
+    "seed": "bun src/prisma/seed.ts"
+  }
+}
