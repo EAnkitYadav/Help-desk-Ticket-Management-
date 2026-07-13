@@ -11,18 +11,26 @@ export async function listTickets(req: Request, res: Response, next: NextFunctio
     const {
       status,
       category,
+      priority,
       assignedTo,
       search,
       sortBy = "createdAt",
       sortOrder = "desc",
       page = "1",
-      limit = "20",
+      limit = "10",
     } = req.query;
 
     const where: Prisma.TicketWhereInput = {};
     if (status) where.status = status as any;
     if (category) where.category = category as any;
-    if (assignedTo) where.assignedToId = assignedTo as string;
+    if (priority) where.priority = priority as any;
+    if (assignedTo) {
+      if (assignedTo === "unassigned") {
+        where.assignedToId = null;
+      } else {
+        where.assignedToId = assignedTo as string;
+      }
+    }
     if (search) {
       where.OR = [
         { subject: { contains: search as string, mode: "insensitive" } },

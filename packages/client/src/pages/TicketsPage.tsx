@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ticketsApi, type Ticket, type Pagination } from "../lib/api";
+import { ticketsApi, usersApi, type Ticket, type Pagination } from "../lib/api";
 import {
   useReactTable,
   getCoreRowModel,
@@ -32,9 +32,12 @@ export function TicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
+  const [agents, setAgents] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState({
     status: "",
     category: "",
+    priority: "",
+    assignedTo: "",
     search: "",
     page: "1",
     sortBy: "createdAt",
@@ -47,6 +50,18 @@ export function TicketsPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const res = await usersApi.list({ limit: "100" });
+        setAgents(res.users);
+      } catch (err) {
+        console.error("Failed to load agents:", err);
+      }
+    };
+    fetchAgents();
+  }, []);
+
+  useEffect(() => {
     loadTickets();
   }, [filters]);
 
@@ -56,8 +71,11 @@ export function TicketsPage() {
       const params: Record<string, string> = {};
       if (filters.status) params.status = filters.status;
       if (filters.category) params.category = filters.category;
+      if (filters.priority) params.priority = filters.priority;
+      if (filters.assignedTo) params.assignedTo = filters.assignedTo;
       if (filters.search) params.search = filters.search;
       params.page = filters.page;
+      params.limit = "10";
       params.sortBy = filters.sortBy;
       params.sortOrder = filters.sortOrder;
 
@@ -203,9 +221,15 @@ export function TicketsPage() {
     columns,
     state: {
       sorting,
+      pagination: {
+        pageIndex: parseInt(filters.page, 10) - 1,
+        pageSize: 10,
+      },
     },
+    pageCount: pagination?.totalPages ?? 0,
     onSortingChange,
     manualSorting: true,
+    manualPagination: true,
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -258,6 +282,30 @@ export function TicketsPage() {
           <option value="TECHNICAL_QUESTION">Technical Question</option>
           <option value="REFUND_REQUEST">Refund Request</option>
         </select>
+        <select
+          value={filters.priority}
+          onChange={(e) => setFilters({ ...filters, priority: e.target.value, page: "1" })}
+          className="bg-[#0f1117] border border-[#2e3140] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3.5 py-2 text-sm text-[#e4e6ec] outline-none transition-all duration-200 cursor-pointer"
+        >
+          <option value="">All Priorities</option>
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+          <option value="URGENT">Urgent</option>
+        </select>
+        <select
+          value={filters.assignedTo}
+          onChange={(e) => setFilters({ ...filters, assignedTo: e.target.value, page: "1" })}
+          className="bg-[#0f1117] border border-[#2e3140] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3.5 py-2 text-sm text-[#e4e6ec] outline-none transition-all duration-200 cursor-pointer"
+        >
+          <option value="">All Assignees</option>
+          <option value="unassigned">Unassigned</option>
+          {agents.map((agent) => (
+            <option key={agent.id} value={agent.id}>
+              {agent.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Tickets Table */}
@@ -274,103 +322,130 @@ export function TicketsPage() {
             <p className="text-xs text-[#6b7080] mt-1">Try adjusting your search criteria or create a new ticket.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr
-                    key={headerGroup.id}
-                    className="bg-[#22262f] border-b border-[#2e3140] text-[11px] font-semibold uppercase tracking-wider text-[#9499a8]"
-                  >
-                    {headerGroup.headers.map((header) => {
-                      const isSortable = header.column.getCanSort();
-                      const sortDirection = header.column.getIsSorted();
-                      return (
-                        <th
-                          key={header.id}
-                          className={`py-3.5 px-5 select-none ${
-                            isSortable
-                              ? "cursor-pointer hover:bg-[#2c313d] hover:text-white transition-colors duration-150"
-                              : ""
-                          }`}
-                          onClick={header.column.getToggleSortingHandler()}
-                        >
-                          <div className="flex items-center gap-1">
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                            {isSortable && (
-                              <span className="inline-block ml-1 text-slate-400">
-                                {sortDirection === "asc" ? (
-                                  <ArrowUp className="w-3.5 h-3.5 inline-block" />
-                                ) : sortDirection === "desc" ? (
-                                  <ArrowDown className="w-3.5 h-3.5 inline-block" />
-                                ) : (
-                                  <ArrowUpDown className="w-3.5 h-3.5 inline-block opacity-40 hover:opacity-100" />
-                                )}
-                              </span>
-                            )}
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </thead>
-              <tbody className="divide-y divide-[#2e3140]/60 text-sm">
-                {table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    onClick={() => navigate(`/tickets/${row.original.id}`)}
-                    className="hover:bg-[#22262f]/80 transition-colors duration-150 cursor-pointer group"
-                  >
-                    {row.getVisibleCells().map((cell) => {
-                      let tdClass = "py-4 px-5";
-                      if (cell.column.id === "subject") tdClass += " max-w-xs";
-                      if (cell.column.id === "category") tdClass += " text-xs text-[#9499a8] font-medium";
-                      if (cell.column.id === "assignedTo") tdClass += " text-xs text-[#e4e6ec]";
-                      if (cell.column.id === "createdAt") tdClass += " text-xs text-[#9499a8] whitespace-nowrap";
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr
+                      key={headerGroup.id}
+                      className="bg-[#22262f] border-b border-[#2e3140] text-[11px] font-semibold uppercase tracking-wider text-[#9499a8]"
+                    >
+                      {headerGroup.headers.map((header) => {
+                        const isSortable = header.column.getCanSort();
+                        const sortDirection = header.column.getIsSorted();
+                        return (
+                          <th
+                            key={header.id}
+                            className={`py-3.5 px-5 select-none ${
+                              isSortable
+                                ? "cursor-pointer hover:bg-[#2c313d] hover:text-white transition-colors duration-150"
+                                : ""
+                            }`}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            <div className="flex items-center gap-1">
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                              {isSortable && (
+                                <span className="inline-block ml-1 text-slate-400">
+                                  {sortDirection === "asc" ? (
+                                    <ArrowUp className="w-3.5 h-3.5 inline-block" />
+                                  ) : sortDirection === "desc" ? (
+                                    <ArrowDown className="w-3.5 h-3.5 inline-block" />
+                                  ) : (
+                                    <ArrowUpDown className="w-3.5 h-3.5 inline-block opacity-40 hover:opacity-100" />
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody className="divide-y divide-[#2e3140]/60 text-sm">
+                  {table.getRowModel().rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      onClick={() => navigate(`/tickets/${row.original.id}`)}
+                      className="hover:bg-[#22262f]/80 transition-colors duration-150 cursor-pointer group"
+                    >
+                      {row.getVisibleCells().map((cell) => {
+                        let tdClass = "py-4 px-5";
+                        if (cell.column.id === "subject") tdClass += " max-w-xs";
+                        if (cell.column.id === "category") tdClass += " text-xs text-[#9499a8] font-medium";
+                        if (cell.column.id === "assignedTo") tdClass += " text-xs text-[#e4e6ec]";
+                        if (cell.column.id === "createdAt") tdClass += " text-xs text-[#9499a8] whitespace-nowrap";
 
-                      return (
-                        <td key={cell.id} className={tdClass}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        return (
+                          <td key={cell.id} className={tdClass}>
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Footer */}
+            {pagination && (
+              <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-t border-[#2e3140]/60 gap-4 bg-[#14161f]">
+                <div className="text-xs text-[#9499a8] font-medium order-2 sm:order-1 select-none">
+                  Showing <strong className="text-[#e4e6ec]">{Math.min((parseInt(filters.page, 10) - 1) * 10 + 1, pagination.total)}</strong>–
+                  <strong className="text-[#e4e6ec]">{Math.min(parseInt(filters.page, 10) * 10, pagination.total)}</strong> of{" "}
+                  <strong className="text-[#e4e6ec]">{pagination.total}</strong> tickets
+                </div>
+                <div className="flex items-center gap-1.5 order-1 sm:order-2">
+                  <button
+                    onClick={() => setFilters({ ...filters, page: "1" })}
+                    disabled={!table.getCanPreviousPage()}
+                    className="flex items-center justify-center p-2 rounded-lg bg-[#0f1117] border border-[#2e3140] hover:bg-[#22262f] text-[#9499a8] hover:text-white disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:text-[#9499a8] disabled:hover:bg-[#0f1117] transition-all duration-150 cursor-pointer min-w-[34px] h-[34px] text-center text-[10px] font-bold"
+                    title="First Page"
+                  >
+                    &lt;&lt;
+                  </button>
+                  <button
+                    onClick={() => setFilters({ ...filters, page: String(parseInt(filters.page, 10) - 1) })}
+                    disabled={!table.getCanPreviousPage()}
+                    className="flex items-center justify-center p-2 rounded-lg bg-[#0f1117] border border-[#2e3140] hover:bg-[#22262f] text-[#9499a8] hover:text-white disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:text-[#9499a8] disabled:hover:bg-[#0f1117] transition-all duration-150 cursor-pointer min-w-[34px] h-[34px] text-center text-[10px] font-bold"
+                    title="Previous Page"
+                  >
+                    &lt;
+                  </button>
+                  <span className="text-xs text-[#9499a8] px-2 font-medium select-none">
+                    Page <strong className="text-[#e4e6ec]">{filters.page}</strong> of <strong className="text-[#e4e6ec]">{pagination.totalPages}</strong>
+                  </span>
+                  <button
+                    onClick={() => setFilters({ ...filters, page: String(parseInt(filters.page, 10) + 1) })}
+                    disabled={!table.getCanNextPage()}
+                    className="flex items-center justify-center p-2 rounded-lg bg-[#0f1117] border border-[#2e3140] hover:bg-[#22262f] text-[#9499a8] hover:text-white disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:text-[#9499a8] disabled:hover:bg-[#0f1117] transition-all duration-150 cursor-pointer min-w-[34px] h-[34px] text-center text-[10px] font-bold"
+                    title="Next Page"
+                  >
+                    &gt;
+                  </button>
+                  <button
+                    onClick={() => setFilters({ ...filters, page: String(pagination.totalPages) })}
+                    disabled={!table.getCanNextPage()}
+                    className="flex items-center justify-center p-2 rounded-lg bg-[#0f1117] border border-[#2e3140] hover:bg-[#22262f] text-[#9499a8] hover:text-white disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:text-[#9499a8] disabled:hover:bg-[#0f1117] transition-all duration-150 cursor-pointer min-w-[34px] h-[34px] text-center text-[10px] font-bold"
+                    title="Last Page"
+                  >
+                    &gt;&gt;
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
-
-      {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between bg-[#1a1d27] border border-[#2e3140] px-6 py-3.5 rounded-2xl shadow-sm">
-          <button
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#22262f] hover:bg-[#2e3140] text-[#e4e6ec] disabled:opacity-40 disabled:cursor-not-allowed border border-[#2e3140] transition-all duration-150 cursor-pointer"
-            disabled={pagination.page <= 1}
-            onClick={() => setFilters({ ...filters, page: String(pagination.page - 1) })}
-          >
-            ← Previous
-          </button>
-          <span className="text-xs font-medium text-[#9499a8]">
-            Page <strong className="text-white">{pagination.page}</strong> of <strong className="text-white">{pagination.totalPages}</strong>
-          </span>
-          <button
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#22262f] hover:bg-[#2e3140] text-[#e4e6ec] disabled:opacity-40 disabled:cursor-not-allowed border border-[#2e3140] transition-all duration-150 cursor-pointer"
-            disabled={pagination.page >= pagination.totalPages}
-            onClick={() => setFilters({ ...filters, page: String(pagination.page + 1) })}
-          >
-            Next →
-          </button>
-        </div>
-      )}
     </div>
   );
 }
