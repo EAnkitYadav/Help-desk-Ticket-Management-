@@ -17,4 +17,20 @@ export const auth = betterAuth({
     process.env.CLIENT_URL || "http://localhost:5173",
     "http://localhost:5174",
   ],
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "AGENT",
+        input: false,
+      },
+      isActive: {
+        type: "boolean",
+        required: false,
+        defaultValue: true,
+        input: false,
+      },
+    },
+  },
 });

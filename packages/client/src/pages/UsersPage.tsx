@@ -139,7 +139,7 @@ export function UsersPage() {
     } else if (value === "name") {
       setFilters({ ...filters, sortBy: "name", sortOrder: "asc", page: "1" });
     } else if (value === "tickets") {
-      setFilters({ ...filters, sortBy: "_count.tickets", sortOrder: "desc", page: "1" });
+      setFilters({ ...filters, sortBy: "_count.assignedTickets", sortOrder: "desc", page: "1" });
     }
   };
 
@@ -280,7 +280,7 @@ export function UsersPage() {
                     <td className="py-4 px-6">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 font-semibold text-xs text-slate-700">
                         <span>🎫</span>
-                        <span>{u._count?.tickets ?? 0} tickets</span>
+                        <span>{u._count?.assignedTickets ?? 0} tickets</span>
                       </span>
                     </td>
                     <td className="py-4 px-6">

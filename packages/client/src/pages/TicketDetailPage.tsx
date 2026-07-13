@@ -120,45 +120,61 @@ export function TicketDetailPage() {
         {/* Conversation Thread */}
         <div className="lg:col-span-2 bg-[#1a1d27] border border-[#2e3140] rounded-2xl overflow-hidden shadow-xl flex flex-col">
           <div className="p-6 flex flex-col gap-4 max-h-[600px] overflow-y-auto divide-y divide-[#2e3140]/40">
-            {ticket.messages?.map((msg) => (
+            {/* Original ticket description */}
+            <div className="pt-4 first:pt-0 flex flex-col gap-2.5 border-l-4 border-blue-500 pl-4 bg-[#0f1117]/40 rounded-r-xl py-3 pr-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm text-white">
+                    {ticket.senderName || ticket.senderEmail}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-400">
+                    CUSTOMER
+                  </span>
+                </div>
+                <span className="text-xs text-[#6b7080] font-medium">{formatDate(ticket.createdAt)}</span>
+              </div>
+              <div className="text-sm text-[#e4e6ec] leading-relaxed whitespace-pre-wrap font-sans">
+                {ticket.description}
+              </div>
+            </div>
+            {/* Agent comments */}
+            {ticket.comments?.map((comment) => (
               <div
-                key={msg.id}
+                key={comment.id}
                 className={`pt-4 first:pt-0 flex flex-col gap-2.5 ${
-                  msg.sender === "CUSTOMER"
-                    ? "border-l-4 border-blue-500 pl-4 bg-[#0f1117]/40 rounded-r-xl py-3 pr-3"
-                    : msg.sender === "AGENT"
-                    ? "border-l-4 border-indigo-500 pl-4 bg-indigo-500/5 rounded-r-xl py-3 pr-3"
-                    : "border-l-4 border-emerald-500 pl-4 bg-emerald-500/5 rounded-r-xl py-3 pr-3"
+                  comment.isAiGenerated
+                    ? "border-l-4 border-emerald-500 pl-4 bg-emerald-500/5 rounded-r-xl py-3 pr-3"
+                    : "border-l-4 border-indigo-500 pl-4 bg-indigo-500/5 rounded-r-xl py-3 pr-3"
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm text-white">
-                      {msg.sender === "CUSTOMER"
-                        ? ticket.senderName || ticket.senderEmail
-                        : msg.sender === "AGENT"
-                        ? msg.senderEmail || "Agent"
-                        : "AI Assistant"}
+                      {comment.isAiGenerated ? "AI Assistant" : (comment.author?.name || "Agent")}
                     </span>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                        msg.sender === "CUSTOMER"
-                          ? "bg-blue-500/15 text-blue-400"
-                          : msg.sender === "AGENT"
-                          ? "bg-indigo-500/15 text-indigo-400"
-                          : "bg-emerald-500/15 text-emerald-400"
+                        comment.isAiGenerated
+                          ? "bg-emerald-500/15 text-emerald-400"
+                          : "bg-indigo-500/15 text-indigo-400"
                       }`}
                     >
-                      {msg.sender}
+                      {comment.isAiGenerated ? "AI" : "AGENT"}
                     </span>
                   </div>
-                  <span className="text-xs text-[#6b7080] font-medium">{formatDate(msg.createdAt)}</span>
+                  <span className="text-xs text-[#6b7080] font-medium">{formatDate(comment.createdAt)}</span>
                 </div>
                 <div className="text-sm text-[#e4e6ec] leading-relaxed whitespace-pre-wrap font-sans">
-                  {msg.body}
+                  {comment.body}
                 </div>
               </div>
             ))}
+            {(!ticket.comments || ticket.comments.length === 0) && (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <span className="text-3xl mb-2">💬</span>
+                <p className="text-xs text-[#6b7080]">No replies yet. Be the first to respond.</p>
+              </div>
+            )}
           </div>
 
           {/* Reply Form */}

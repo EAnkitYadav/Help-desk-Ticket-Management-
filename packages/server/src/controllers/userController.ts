@@ -64,6 +64,11 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10)));
     const skip = (pageNum - 1) * limitNum;
 
+    // Build orderBy — supports nested keys like "_count.assignedTickets"
+    const orderBy = (sortBy as string).includes(".")
+      ? { [(sortBy as string).split(".")[0]]: { [(sortBy as string).split(".")[1]]: sortOrder } }
+      : { [sortBy as string]: sortOrder };
+
     const [users, total, totalAll, activeCount, adminCount, agentCount] = await Promise.all([
       prisma.user.findMany({
         where,
@@ -74,9 +79,9 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
           role: true,
           isActive: true,
           createdAt: true,
-          _count: { select: { tickets: true } },
+          _count: { select: { assignedTickets: true } },
         },
-        orderBy: { [sortBy as string]: sortOrder },
+        orderBy,
         skip,
         take: limitNum,
       }),

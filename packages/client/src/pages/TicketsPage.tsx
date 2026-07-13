@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ticketsApi, type Ticket, type Pagination } from "../lib/api";
+import {
+  useReactTable,
+  getCoreRowModel,
+  flexRender,
+  type SortingState,
+} from "@tanstack/react-table";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   OPEN: "bg-blue-500/15 text-blue-400 border border-blue-500/20",
@@ -25,7 +32,18 @@ export function TicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ status: "", category: "", search: "", page: "1" });
+  const [filters, setFilters] = useState({
+    status: "",
+    category: "",
+    search: "",
+    page: "1",
+    sortBy: "createdAt",
+    sortOrder: "desc",
+  });
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "createdAt", desc: true },
+  ]);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,6 +58,8 @@ export function TicketsPage() {
       if (filters.category) params.category = filters.category;
       if (filters.search) params.search = filters.search;
       params.page = filters.page;
+      params.sortBy = filters.sortBy;
+      params.sortOrder = filters.sortOrder;
 
       const data = await ticketsApi.list(params);
       setTickets(data.tickets);
@@ -59,6 +79,135 @@ export function TicketsPage() {
       minute: "2-digit",
     });
   };
+
+  const onSortingChange = (updaterOrValue: any) => {
+    const nextSorting = typeof updaterOrValue === "function" ? updaterOrValue(sorting) : updaterOrValue;
+    setSorting(nextSorting);
+    if (nextSorting && nextSorting.length > 0) {
+      setFilters((prev) => ({
+        ...prev,
+        sortBy: nextSorting[0].id,
+        sortOrder: nextSorting[0].desc ? "desc" : "asc",
+        page: "1",
+      }));
+    } else {
+      setFilters((prev) => ({
+        ...prev,
+        sortBy: "createdAt",
+        sortOrder: "desc",
+        page: "1",
+      }));
+    }
+  };
+
+  const columns = [
+    {
+      accessorKey: "subject",
+      header: "Subject",
+      enableSorting: true,
+      cell: ({ row }: any) => {
+        const ticket = row.original;
+        return (
+          <>
+            <span className="font-semibold text-white group-hover:text-indigo-300 transition-colors block truncate">
+              {ticket.subject}
+            </span>
+            {ticket._count && (
+              <span className="text-[11px] text-[#6b7080] font-medium mt-0.5 inline-block">
+                {ticket._count.comments} comment{ticket._count.comments !== 1 ? "s" : ""}
+              </span>
+            )}
+          </>
+        );
+      },
+    },
+    {
+      accessorKey: "senderName",
+      header: "Sender",
+      enableSorting: true,
+      cell: ({ row }: any) => {
+        const ticket = row.original;
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium text-[#e4e6ec]">{ticket.senderName || ticket.senderEmail}</span>
+            {ticket.senderName && (
+              <span className="text-xs text-[#6b7080]">{ticket.senderEmail}</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      enableSorting: true,
+      cell: ({ row }: any) => {
+        const status = row.getValue("status") as string;
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${STATUS_COLORS[status] || "bg-gray-500/15 text-gray-400"}`}>
+            {status}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: "category",
+      header: "Category",
+      enableSorting: true,
+      cell: ({ row }: any) => {
+        const category = row.getValue("category") as string;
+        return category ? CATEGORY_LABELS[category] || category : "—";
+      },
+    },
+    {
+      accessorKey: "priority",
+      header: "Priority",
+      enableSorting: true,
+      cell: ({ row }: any) => {
+        const priority = row.getValue("priority") as string;
+        return priority ? (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${PRIORITY_COLORS[priority] || "bg-gray-500/15 text-gray-400"}`}>
+            {priority}
+          </span>
+        ) : "—";
+      },
+    },
+    {
+      accessorKey: "assignedTo",
+      header: "Assigned To",
+      enableSorting: false,
+      cell: ({ row }: any) => {
+        const ticket = row.original;
+        return ticket.assignedTo?.name ? (
+          <span className="inline-flex items-center gap-1.5 bg-[#22262f] border border-[#2e3140] px-2.5 py-1 rounded-lg">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+            {ticket.assignedTo.name}
+          </span>
+        ) : (
+          <span className="text-[#6b7080] italic">Unassigned</span>
+        );
+      },
+    },
+    {
+      accessorKey: "createdAt",
+      header: "Created",
+      enableSorting: true,
+      cell: ({ row }: any) => {
+        return formatDate(row.getValue("createdAt"));
+      },
+    },
+  ];
+
+  const table = useReactTable({
+    data: tickets,
+    columns,
+    state: {
+      sorting,
+    },
+    onSortingChange,
+    manualSorting: true,
+    getCoreRowModel: getCoreRowModel(),
+  });
 
   return (
     <div className="flex flex-col gap-6 w-full animate-fade-in">
@@ -128,69 +277,70 @@ export function TicketsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-[#22262f] border-b border-[#2e3140] text-[11px] font-semibold uppercase tracking-wider text-[#9499a8]">
-                  <th className="py-3.5 px-5">Subject</th>
-                  <th className="py-3.5 px-5">Sender</th>
-                  <th className="py-3.5 px-5">Status</th>
-                  <th className="py-3.5 px-5">Category</th>
-                  <th className="py-3.5 px-5">Priority</th>
-                  <th className="py-3.5 px-5">Assigned To</th>
-                  <th className="py-3.5 px-5">Created</th>
-                </tr>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr
+                    key={headerGroup.id}
+                    className="bg-[#22262f] border-b border-[#2e3140] text-[11px] font-semibold uppercase tracking-wider text-[#9499a8]"
+                  >
+                    {headerGroup.headers.map((header) => {
+                      const isSortable = header.column.getCanSort();
+                      const sortDirection = header.column.getIsSorted();
+                      return (
+                        <th
+                          key={header.id}
+                          className={`py-3.5 px-5 select-none ${
+                            isSortable
+                              ? "cursor-pointer hover:bg-[#2c313d] hover:text-white transition-colors duration-150"
+                              : ""
+                          }`}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          <div className="flex items-center gap-1">
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                            {isSortable && (
+                              <span className="inline-block ml-1 text-slate-400">
+                                {sortDirection === "asc" ? (
+                                  <ArrowUp className="w-3.5 h-3.5 inline-block" />
+                                ) : sortDirection === "desc" ? (
+                                  <ArrowDown className="w-3.5 h-3.5 inline-block" />
+                                ) : (
+                                  <ArrowUpDown className="w-3.5 h-3.5 inline-block opacity-40 hover:opacity-100" />
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                ))}
               </thead>
               <tbody className="divide-y divide-[#2e3140]/60 text-sm">
-                {tickets.map((ticket) => (
+                {table.getRowModel().rows.map((row) => (
                   <tr
-                    key={ticket.id}
-                    onClick={() => navigate(`/tickets/${ticket.id}`)}
+                    key={row.id}
+                    onClick={() => navigate(`/tickets/${row.original.id}`)}
                     className="hover:bg-[#22262f]/80 transition-colors duration-150 cursor-pointer group"
                   >
-                    <td className="py-4 px-5 max-w-xs">
-                      <span className="font-semibold text-white group-hover:text-indigo-300 transition-colors block truncate">
-                        {ticket.subject}
-                      </span>
-                      {ticket._count && (
-                        <span className="text-[11px] text-[#6b7080] font-medium mt-0.5 inline-block">
-                          {ticket._count.messages} message{ticket._count.messages !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 px-5">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-[#e4e6ec]">{ticket.senderName || ticket.senderEmail}</span>
-                        {ticket.senderName && (
-                          <span className="text-xs text-[#6b7080]">{ticket.senderEmail}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 px-5">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${STATUS_COLORS[ticket.status] || "bg-gray-500/15 text-gray-400"}`}>
-                        {ticket.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-5 text-xs text-[#9499a8] font-medium">
-                      {ticket.category ? CATEGORY_LABELS[ticket.category] || ticket.category : "—"}
-                    </td>
-                    <td className="py-4 px-5">
-                      {ticket.priority ? (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${PRIORITY_COLORS[ticket.priority] || "bg-gray-500/15 text-gray-400"}`}>
-                          {ticket.priority}
-                        </span>
-                      ) : <span className="text-[#6b7080] text-xs font-medium">—</span>}
-                    </td>
-                    <td className="py-4 px-5 text-xs text-[#e4e6ec]">
-                      {ticket.assignedTo?.name ? (
-                        <span className="inline-flex items-center gap-1.5 bg-[#22262f] border border-[#2e3140] px-2.5 py-1 rounded-lg">
-                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                          {ticket.assignedTo.name}
-                        </span>
-                      ) : (
-                        <span className="text-[#6b7080] italic">Unassigned</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-5 text-xs text-[#9499a8] whitespace-nowrap">
-                      {formatDate(ticket.createdAt)}
-                    </td>
+                    {row.getVisibleCells().map((cell) => {
+                      let tdClass = "py-4 px-5";
+                      if (cell.column.id === "subject") tdClass += " max-w-xs";
+                      if (cell.column.id === "category") tdClass += " text-xs text-[#9499a8] font-medium";
+                      if (cell.column.id === "assignedTo") tdClass += " text-xs text-[#e4e6ec]";
+                      if (cell.column.id === "createdAt") tdClass += " text-xs text-[#9499a8] whitespace-nowrap";
+
+                      return (
+                        <td key={cell.id} className={tdClass}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>

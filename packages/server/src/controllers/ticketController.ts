@@ -40,7 +40,7 @@ export async function listTickets(req: Request, res: Response, next: NextFunctio
         where,
         include: {
           assignedTo: { select: { id: true, name: true, email: true } },
-          _count: { select: { messages: true } },
+          _count: { select: { comments: true } },
         },
         orderBy: { [sortBy as string]: sortOrder },
         skip,
@@ -75,7 +75,7 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
       where: { id },
       include: {
         assignedTo: { select: { id: true, name: true, email: true } },
-        messages: { orderBy: { createdAt: "asc" } },
+        comments: { orderBy: { createdAt: "asc" }, include: { author: { select: { id: true, name: true, email: true } } } },
       },
     });
 
@@ -96,11 +96,12 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
  */
 export async function createTicket(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { subject, body, senderEmail, senderName, category, priority } = req.body;
+    const { subject, body, description, senderEmail, senderName, category, priority } = req.body;
+    const ticketDescription = description || body;
 
-    if (!subject || !body || !senderEmail) {
+    if (!subject || !ticketDescription || !senderEmail) {
       res.status(400).json({
-        error: "Subject, body, and sender email are required",
+        error: "Subject, description, and sender email are required",
         code: "VALIDATION_ERROR",
       });
       return;
@@ -109,21 +110,14 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
     const ticket = await prisma.ticket.create({
       data: {
         subject,
-        body,
+        description: ticketDescription,
         senderEmail,
-        senderName,
-        category,
-        priority,
-        messages: {
-          create: {
-            body,
-            sender: "CUSTOMER",
-            senderEmail,
-          },
-        },
+        senderName: senderName || "",
+        category: category || undefined,
+        priority: priority || undefined,
       },
       include: {
-        messages: true,
+        comments: true,
         assignedTo: { select: { id: true, name: true, email: true } },
       },
     });
@@ -154,7 +148,7 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
       data: updateData,
       include: {
         assignedTo: { select: { id: true, name: true, email: true } },
-        messages: { orderBy: { createdAt: "asc" } },
+        comments: { orderBy: { createdAt: "asc" } },
       },
     });
 
@@ -174,7 +168,7 @@ export async function addMessage(req: Request, res: Response, next: NextFunction
     const { body } = req.body;
 
     if (!body) {
-      res.status(400).json({ error: "Message body is required", code: "VALIDATION_ERROR" });
+      res.status(400).json({ error: "Comment body is required", code: "VALIDATION_ERROR" });
       return;
     }
 
@@ -185,18 +179,11 @@ export async function addMessage(req: Request, res: Response, next: NextFunction
       return;
     }
 
-    // Get the current user's email for the message
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { email: true },
-    });
-
-    const message = await prisma.message.create({
+    const comment = await prisma.comment.create({
       data: {
         ticketId: id,
         body,
-        sender: "AGENT",
-        senderEmail: user?.email,
+        authorId: req.userId,
       },
     });
 
@@ -208,7 +195,7 @@ export async function addMessage(req: Request, res: Response, next: NextFunction
       });
     }
 
-    res.status(201).json({ message });
+    res.status(201).json({ message: comment });
   } catch (error) {
     next(error);
   }

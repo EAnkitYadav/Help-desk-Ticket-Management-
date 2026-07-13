@@ -14,7 +14,7 @@ export interface User {
   role: Role;
   isActive?: boolean;
   createdAt?: string;
-  _count?: { tickets: number };
+  _count?: { assignedTickets: number };
 }
 
 export interface LoginResponse {
@@ -25,7 +25,8 @@ export interface LoginResponse {
 export interface Ticket {
   id: string;
   subject: string;
-  body: string;
+  description: string;
+  body?: string; // alias for description, for backward compat
   senderEmail: string;
   senderName: string | null;
   status: "OPEN" | "RESOLVED" | "CLOSED";
@@ -35,19 +36,22 @@ export interface Ticket {
   aiSuggestedReply: string | null;
   assignedToId: string | null;
   assignedTo: { id: string; name: string; email: string } | null;
-  messages?: Message[];
-  _count?: { messages: number };
+  comments?: Comment[];
+  _count?: { comments: number };
   createdAt: string;
   updatedAt: string;
 }
 
-export interface Message {
+export interface Comment {
   id: string;
-  ticketId: string;
   body: string;
-  sender: "CUSTOMER" | "AGENT" | "AI";
-  senderEmail: string | null;
+  isInternal: boolean;
+  isAiGenerated: boolean;
+  ticketId: string;
+  authorId: string | null;
+  author?: { id: string; name: string; email: string } | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface DashboardStats {
