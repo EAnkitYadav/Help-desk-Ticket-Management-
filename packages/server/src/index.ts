@@ -36,6 +36,8 @@ app.use((req, res, next) => {
 const allowedOrigins = [
   process.env.CLIENT_URL || "http://localhost:5173",
   "http://localhost:5174",
+  process.env.BETTER_AUTH_URL || `http://localhost:${PORT}`,
+  `http://localhost:${PORT}`,
 ];
 
 app.use(
