@@ -99,7 +99,7 @@ if (process.env.NODE_ENV === "production") {
     console.log(`Serving static files from: ${clientDistPath}`);
     app.use(express.static(clientDistPath));
 
-    app.get("*", (req, res, next) => {
+    app.get("*any", (req, res, next) => {
       if (req.path.startsWith("/api")) {
         return next();
       }
