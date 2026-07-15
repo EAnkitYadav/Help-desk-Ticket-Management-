@@ -94,9 +94,17 @@ async function main() {
 
   // ─── Create Sample Tickets ──────────────────────────────────────────────────
 
-  // Clean up existing tickets and comments to allow a fresh seed
-  await prisma.comment.deleteMany({});
-  await prisma.ticket.deleteMany({});
+  const isProduction = process.env.NODE_ENV === "production";
+  const existingTicketsCount = await prisma.ticket.count();
+
+  if (isProduction && existingTicketsCount > 0) {
+    console.log(`  ℹ️ Tickets already exist (${existingTicketsCount}), skipping sample tickets/comments creation.`);
+  } else {
+    if (!isProduction) {
+      console.log("  Cleaning up existing tickets and comments for fresh development seed...");
+      await prisma.comment.deleteMany({});
+      await prisma.ticket.deleteMany({});
+    }
 
   const FIRST_NAMES = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah", "Charles", "Karen"];
   const LAST_NAMES = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin"];
@@ -330,6 +338,7 @@ async function main() {
     }
   }
   console.log("  ✅ Created sample comments for selected tickets");
+  }
 
   // ─── Create Knowledge Articles ──────────────────────────────────────────────
 
