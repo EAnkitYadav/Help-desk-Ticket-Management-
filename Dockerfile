@@ -15,7 +15,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 
 # Build both the client and the server
-RUN bun run build
+RUN NODE_ENV=production bun run build
 
 # Use a slim Bun image for the final production runner stage
 FROM oven/bun:1-slim AS runner
