@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+process.env.WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "test-webhook-secret";
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -53,6 +55,8 @@ export default defineConfig({
         BETTER_AUTH_URL: "http://localhost:3002",
         CLIENT_URL: "http://localhost:5174",
         NODE_ENV: "test",
+        WEBHOOK_SECRET: process.env.WEBHOOK_SECRET || "test-webhook-secret",
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || "mock-key",
       },
       timeout: 60 * 1000,
     },

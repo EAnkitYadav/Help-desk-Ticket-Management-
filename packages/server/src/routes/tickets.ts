@@ -9,7 +9,7 @@ import {
 } from "../controllers/ticketController.js";
 import { authMiddleware } from "../middlewares/auth.js";
 
-const router = Router();
+const router: Router = Router();
 
 // All ticket routes require authentication
 router.use(authMiddleware);
@@ -23,6 +23,6 @@ router.post("/:id/messages", addMessage);
 export default router;
 
 // Dashboard route (exported separately)
-export const dashboardRouter = Router();
+export const dashboardRouter: Router = Router();
 dashboardRouter.use(authMiddleware);
 dashboardRouter.get("/stats", getDashboardStats);

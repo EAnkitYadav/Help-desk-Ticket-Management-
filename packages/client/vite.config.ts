@@ -1,5 +1,5 @@
 import path from "path";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -12,11 +12,17 @@ export default defineConfig({
   },
   server: {
     port: Number(process.env.PORT) || 5173,
+    allowedHosts: true,
     proxy: {
       "/api": {
         target: process.env.VITE_API_URL || "http://localhost:3001",
         changeOrigin: true,
       },
     },
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: "./src/test/setup.ts",
   },
 });

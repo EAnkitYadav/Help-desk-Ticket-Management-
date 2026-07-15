@@ -54,6 +54,7 @@ This document tracks the architectural decisions, established patterns, implemen
 - **Phase 2: Authentication**: Better Auth integration, Login page, session middleware, logout flow, route protection, production rate limiting.
 - **Phase 3: User Management**: Admin-only Users page (`UsersPage.tsx`), CRUD endpoints for agents/admins, role-based access control (Admin vs. Agent).
 - **Phase 4: Ticket CRUD**: Full ticket lifecycle management. Creation (`CreateTicketPage.tsx`), filtering/sorting list view (`TicketsPage.tsx`), detailed conversation view (`TicketDetailPage.tsx`), status and assignment updates.
+- **Phase 6: Inbound Email Webhook**: Integration of SendGrid's inbound email webhook parser to automatically create tickets or thread replies to existing tickets based on subject line matching.
 - **Phase 7: Dashboard**: Executive overview (`DashboardPage.tsx`) featuring real-time ticket counts (Open, Resolved, Closed), category breakdown charts, recent activity lists, and quick-nav filters.
 
 ### ⏳ Next Phases (Pending)
@@ -62,8 +63,7 @@ This document tracks the architectural decisions, established patterns, implemen
   - Auto-classification of incoming tickets by category and priority.
   - AI ticket summaries and suggested reply generation for agents.
   - Knowledge base management and semantic retrieval.
-- **Phase 6: Email Integration**:
-  - SendGrid / Mailgun webhook handling for inbound email ticket creation.
+- **Phase 6: Email Integration (Outbound)**:
   - Outbound email replies linked via email threading headers (`message-id`, `in-reply-to`).
 - **Phase 8: Polish & Deployment**:
   - Comprehensive Dockerization (`Dockerfile` for client and server, `docker-compose.yml`).

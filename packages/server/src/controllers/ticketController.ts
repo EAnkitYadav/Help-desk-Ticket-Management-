@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma.js";
-import { Prisma } from "@prisma/client";
+import { Prisma, TicketStatus, TicketCategory, TicketPriority } from "@prisma/client";
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { enqueueClassification, enqueueAutoResolve } from "../lib/queue.js";
 
 /**
  * GET /api/tickets
@@ -21,9 +24,13 @@ export async function listTickets(req: Request, res: Response, next: NextFunctio
     } = req.query;
 
     const where: Prisma.TicketWhereInput = {};
-    if (status) where.status = status as any;
-    if (category) where.category = category as any;
-    if (priority) where.priority = priority as any;
+    if (status) {
+      where.status = status as TicketStatus;
+    } else {
+      where.status = { notIn: ["PROCESSING", "NEW"] };
+    }
+    if (category) where.category = category as TicketCategory;
+    if (priority) where.priority = priority as TicketPriority;
     if (assignedTo) {
       if (assignedTo === "unassigned") {
         where.assignedToId = null;
@@ -80,7 +87,7 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
     const { id } = req.params;
 
     const ticket = await prisma.ticket.findUnique({
-      where: { id },
+      where: { id: id as string },
       include: {
         assignedTo: { select: { id: true, name: true, email: true } },
         comments: { orderBy: { createdAt: "asc" }, include: { author: { select: { id: true, name: true, email: true } } } },
@@ -95,6 +102,96 @@ export async function getTicket(req: Request, res: Response, next: NextFunction)
     res.json({ ticket });
   } catch (error) {
     next(error);
+  }
+}
+
+export async function classifyTicketBackground(
+  ticketId: string,
+  classifyCategory: boolean,
+  classifyPriority: boolean
+): Promise<void> {
+  try {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+    });
+    if (!ticket) return;
+
+    const hasOpenAIKey = process.env.NODE_ENV !== "test" &&
+                         process.env.OPENAI_API_KEY &&
+                         process.env.OPENAI_API_KEY !== "your-openai-api-key" &&
+                         process.env.OPENAI_API_KEY.trim() !== "";
+
+    let category = ticket.category;
+    let priority = ticket.priority;
+    let didClassify = false;
+
+    if (hasOpenAIKey) {
+      try {
+        const prompt = `You are a support ticket classification assistant.
+Given the following ticket subject and description, classify the ticket.
+
+Ticket Subject: ${ticket.subject}
+Description:
+"${ticket.description}"
+
+Available Categories: GENERAL_QUESTION, TECHNICAL_QUESTION, REFUND_REQUEST
+Available Priorities: LOW, MEDIUM, HIGH, URGENT
+
+Respond in valid JSON format only, matching this structure:
+{
+  "category": "GENERAL_QUESTION" | "TECHNICAL_QUESTION" | "REFUND_REQUEST",
+  "priority": "LOW" | "MEDIUM" | "HIGH" | "URGENT"
+}`;
+
+        const response = await generateText({
+          model: openai("gpt-4o-mini"),
+          prompt,
+        });
+
+        const result = JSON.parse(response.text.trim());
+        if (classifyCategory && result.category) category = result.category;
+        if (classifyPriority && result.priority) priority = result.priority;
+        didClassify = true;
+      } catch (err) {
+        console.error("AI classification failed, falling back to keyword rules:", err);
+      }
+    }
+
+    if (!didClassify) {
+      // Fallback/Mock classification logic based on keywords
+      const text = `${ticket.subject} ${ticket.description}`.toLowerCase();
+      if (classifyCategory) {
+        if (text.includes("refund") || text.includes("billing") || text.includes("charge") || text.includes("money back")) {
+          category = "REFUND_REQUEST";
+        } else if (text.includes("error") || text.includes("bug") || text.includes("crash") || text.includes("failed") || text.includes("technical") || text.includes("setup")) {
+          category = "TECHNICAL_QUESTION";
+        } else {
+          category = "GENERAL_QUESTION";
+        }
+      }
+      if (classifyPriority) {
+        if (text.includes("urgent") || text.includes("crash") || text.includes("asap") || text.includes("emergency")) {
+          priority = "URGENT";
+        } else if (text.includes("important") || text.includes("high") || text.includes("refund")) {
+          priority = "HIGH";
+        } else if (text.includes("low") || text.includes("minor")) {
+          priority = "LOW";
+        } else {
+          priority = "MEDIUM";
+        }
+      }
+    }
+
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: {
+        category,
+        priority,
+      },
+    });
+    console.log(`[AI Classification] Ticket ${ticketId} auto-classified: Category=${category}, Priority=${priority}`);
+  } catch (error) {
+    console.error("Error in automatic ticket classification:", error);
   }
 }
 
@@ -130,6 +227,20 @@ export async function createTicket(req: Request, res: Response, next: NextFuncti
       },
     });
 
+    // Run classification using pg-boss queue
+    const classifyCategory = !category;
+    const classifyPriority = !priority;
+    if (classifyCategory || classifyPriority) {
+      enqueueClassification(ticket.id, classifyCategory, classifyPriority).catch((err) => {
+        console.error("Error enqueuing ticket classification:", err);
+      });
+    }
+
+    // Run auto-resolution using pg-boss queue
+    enqueueAutoResolve(ticket.id).catch((err) => {
+      console.error("Error enqueuing ticket auto-resolution:", err);
+    });
+
     res.status(201).json({ ticket });
   } catch (error) {
     next(error);
@@ -145,14 +256,14 @@ export async function updateTicket(req: Request, res: Response, next: NextFuncti
     const { id } = req.params;
     const { status, category, priority, assignedToId } = req.body;
 
-    const updateData: Record<string, unknown> = {};
-    if (status !== undefined) updateData.status = status;
-    if (category !== undefined) updateData.category = category;
-    if (priority !== undefined) updateData.priority = priority;
+    const updateData: Prisma.TicketUncheckedUpdateInput = {};
+    if (status !== undefined) updateData.status = status as TicketStatus;
+    if (category !== undefined) updateData.category = category as TicketCategory;
+    if (priority !== undefined) updateData.priority = priority as TicketPriority;
     if (assignedToId !== undefined) updateData.assignedToId = assignedToId;
 
     const ticket = await prisma.ticket.update({
-      where: { id },
+      where: { id: id as string },
       data: updateData,
       include: {
         assignedTo: { select: { id: true, name: true, email: true } },
@@ -181,7 +292,7 @@ export async function addMessage(req: Request, res: Response, next: NextFunction
     }
 
     // Verify ticket exists
-    const ticket = await prisma.ticket.findUnique({ where: { id } });
+    const ticket = await prisma.ticket.findUnique({ where: { id: id as string } });
     if (!ticket) {
       res.status(404).json({ error: "Ticket not found", code: "NOT_FOUND" });
       return;
@@ -189,7 +300,7 @@ export async function addMessage(req: Request, res: Response, next: NextFunction
 
     const comment = await prisma.comment.create({
       data: {
-        ticketId: id,
+        ticketId: id as string,
         body,
         authorId: req.userId,
       },
@@ -198,7 +309,7 @@ export async function addMessage(req: Request, res: Response, next: NextFunction
     // Auto-update ticket status if it was closed
     if (ticket.status === "CLOSED") {
       await prisma.ticket.update({
-        where: { id },
+        where: { id: id as string },
         data: { status: "OPEN" },
       });
     }

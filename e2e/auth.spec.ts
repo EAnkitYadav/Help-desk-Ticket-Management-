@@ -12,7 +12,7 @@ test.describe('Authentication Flows', () => {
 
     await page.waitForURL('/dashboard');
     await expect(page.getByRole('heading', { name: 'Dashboard Overview' })).toBeVisible();
-    await expect(page.getByText('Admin User')).toBeVisible();
+    await expect(page.getByText('Admin User').first()).toBeVisible();
   });
 
   test('support agent can successfully sign in', async ({ page }) => {
@@ -23,7 +23,7 @@ test.describe('Authentication Flows', () => {
     await page.getByRole('button', { name: 'Sign in' }).click();
 
     await page.waitForURL('/dashboard');
-    await expect(page.getByText('Sarah Johnson')).toBeVisible();
+    await expect(page.getByText('Sarah Johnson').first()).toBeVisible();
   });
 
   test('invalid credentials display an error message', async ({ page }) => {

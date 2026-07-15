@@ -29,7 +29,7 @@ export interface Ticket {
   body?: string; // alias for description, for backward compat
   senderEmail: string;
   senderName: string | null;
-  status: "OPEN" | "RESOLVED" | "CLOSED";
+  status: "NEW" | "PROCESSING" | "OPEN" | "RESOLVED" | "CLOSED";
   category: "GENERAL_QUESTION" | "TECHNICAL_QUESTION" | "REFUND_REQUEST" | null;
   priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | null;
   aiSummary: string | null;
@@ -181,7 +181,7 @@ export const ticketsApi = {
     }),
 
   addMessage: (ticketId: string, body: string) =>
-    request<{ message: Message }>(`/tickets/${ticketId}/messages`, {
+    request<{ message: Comment }>(`/tickets/${ticketId}/messages`, {
       method: "POST",
       body: JSON.stringify({ body }),
     }),
@@ -191,4 +191,20 @@ export const ticketsApi = {
 
 export const dashboardApi = {
   getStats: () => request<DashboardStats>("/dashboard/stats"),
+};
+
+// ─── AI API ─────────────────────────────────────────────
+
+export const aiApi = {
+  polishReply: (text: string, ticketId?: string) =>
+    request<{ polishedText: string }>("/ai/polish", {
+      method: "POST",
+      body: JSON.stringify({ text, ticketId }),
+    }),
+
+  summarize: (ticketId: string) =>
+    request<{ summary: string }>("/ai/summarize", {
+      method: "POST",
+      body: JSON.stringify({ ticketId }),
+    }),
 };

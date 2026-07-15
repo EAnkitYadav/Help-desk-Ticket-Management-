@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import * as Sentry from "@sentry/node";
 
 // Extend Express Request to include user session data
 declare global {
@@ -25,6 +26,12 @@ export function errorHandler(
   console.error("Unhandled error:", err);
 
   const statusCode = (err as any).statusCode || 500;
+
+  // Report server errors to Sentry
+  if (statusCode >= 500) {
+    Sentry.captureException(err);
+  }
+
   res.status(statusCode).json({
     error: err.message || "Internal Server Error",
     code: (err as any).code || "INTERNAL_ERROR",

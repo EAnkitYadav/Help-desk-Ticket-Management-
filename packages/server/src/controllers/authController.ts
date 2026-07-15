@@ -1,14 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma.js";
-
-// Use Bun's built-in password hashing
-const hashPassword = async (password: string): Promise<string> => {
-  return await Bun.password.hash(password, { algorithm: "bcrypt", cost: 10 });
-};
-
-const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
-  return await Bun.password.verify(password, hash);
-};
+import crypto from "crypto";
+import { hashPassword, verifyPassword } from "better-auth/crypto";
 
 /**
  * POST /api/auth/login
@@ -22,9 +15,18 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       return;
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        accounts: {
+          where: { providerId: "credential" },
+        },
+      },
+    });
 
-    if (!user || !(await verifyPassword(password, user.password))) {
+    const account = user?.accounts[0];
+
+    if (!user || !account || !account.password || !(await verifyPassword({ hash: account.password, password }))) {
       res.status(401).json({ error: "Invalid email or password", code: "INVALID_CREDENTIALS" });
       return;
     }
@@ -35,8 +37,11 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     }
 
     // Create session (expires in 7 days)
+    const token = crypto.randomUUID();
     const session = await prisma.session.create({
       data: {
+        id: token,
+        token: token,
         userId: user.id,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },

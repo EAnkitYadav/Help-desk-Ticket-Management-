@@ -1,11 +1,10 @@
+import { hashPassword, verifyPassword } from "better-auth/crypto";
+
 /**
- * Hash a password using Bun's built-in password hashing (bcrypt).
+ * Hash a password using Better Auth's password hashing.
  */
 export async function hash(password: string): Promise<string> {
-  return Bun.password.hash(password, {
-    algorithm: "bcrypt",
-    cost: 10,
-  });
+  return hashPassword(password);
 }
 
 /**
@@ -15,5 +14,5 @@ export async function verify(
   password: string,
   hashedPassword: string
 ): Promise<boolean> {
-  return Bun.password.verify(password, hashedPassword);
+  return verifyPassword({ hash: hashedPassword, password });
 }

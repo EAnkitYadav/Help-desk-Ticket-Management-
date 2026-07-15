@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma.js";
-import { Prisma } from "@prisma/client";
-import { hashPassword } from "./authController.js";
+import { Prisma, Role } from "@prisma/client";
+import { hashPassword } from "better-auth/crypto";
+import { betterAuth } from "better-auth";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 
 /**
  * GET /api/users/stats
@@ -44,7 +46,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const where: Prisma.UserWhereInput = {};
 
     if (role) {
-      where.role = role as any;
+      where.role = role as Role;
     }
 
     if (status === "active" || isActive === "true") {
@@ -132,17 +134,38 @@ export async function createUser(req: Request, res: Response, next: NextFunction
       return;
     }
 
-    const hashedPassword = await hashPassword(password);
+    const adminAuth = betterAuth({
+      database: prismaAdapter(prisma, {
+        provider: "postgresql",
+      }),
+      emailAndPassword: {
+        enabled: true,
+      },
+    });
 
-    const user = await prisma.user.create({
-      data: {
+    const signUpResult = await adminAuth.api.signUpEmail({
+      body: {
         email,
-        password: hashedPassword,
+        password,
         name,
-        role: role || "AGENT",
+      },
+    });
+
+    if (!signUpResult || !signUpResult.user) {
+      res.status(500).json({ error: "Failed to create user account", code: "INTERNAL_ERROR" });
+      return;
+    }
+
+    const user = await prisma.user.update({
+      where: { id: signUpResult.user.id },
+      data: {
+        role: (role as Role) || "AGENT",
       },
       select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
     });
+
+    // Clean up temporary session created by signUpEmail
+    await prisma.session.deleteMany({ where: { userId: user.id } });
 
     res.status(201).json({ user });
   } catch (error) {
@@ -159,18 +182,35 @@ export async function updateUser(req: Request, res: Response, next: NextFunction
     const { id } = req.params;
     const { email, name, role, isActive, password } = req.body;
 
-    const updateData: Record<string, unknown> = {};
+    const updateData: Prisma.UserUpdateInput = {};
     if (email !== undefined) updateData.email = email;
     if (name !== undefined) updateData.name = name;
-    if (role !== undefined) updateData.role = role;
+    if (role !== undefined) updateData.role = role as Role;
     if (isActive !== undefined) updateData.isActive = isActive;
-    if (password) updateData.password = await hashPassword(password);
+
+    if (password) {
+      const hashedPassword = await hashPassword(password);
+      await prisma.account.updateMany({
+        where: { userId: id as string, providerId: "credential" },
+        data: { password: hashedPassword },
+      });
+    }
 
     const user = await prisma.user.update({
-      where: { id },
+      where: { id: id as string },
       data: updateData,
       select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
     });
+
+    if (isActive === false) {
+      // Unassign all tickets assigned to this user
+      await prisma.ticket.updateMany({
+        where: { assignedToId: id as string },
+        data: { assignedToId: null },
+      });
+      // Invalidate all sessions for this user
+      await prisma.session.deleteMany({ where: { userId: id as string } });
+    }
 
     res.json({ user });
   } catch (error) {
@@ -193,12 +233,18 @@ export async function deleteUser(req: Request, res: Response, next: NextFunction
     }
 
     await prisma.user.update({
-      where: { id },
+      where: { id: id as string },
       data: { isActive: false },
     });
 
+    // Unassign all tickets assigned to this user
+    await prisma.ticket.updateMany({
+      where: { assignedToId: id as string },
+      data: { assignedToId: null },
+    });
+
     // Invalidate all sessions for this user
-    await prisma.session.deleteMany({ where: { userId: id } });
+    await prisma.session.deleteMany({ where: { userId: id as string } });
 
     res.json({ message: "User deactivated successfully" });
   } catch (error) {

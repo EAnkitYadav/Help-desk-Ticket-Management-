@@ -2,7 +2,7 @@ import { Router } from "express";
 import { listUsers, getUserStats, createUser, updateUser, deleteUser } from "../controllers/userController.js";
 import { authMiddleware, adminMiddleware } from "../middlewares/auth.js";
 
-const router = Router();
+const router: Router = Router();
 
 // All user routes require admin
 router.use(authMiddleware, adminMiddleware);

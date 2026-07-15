@@ -7,13 +7,15 @@
     "dev:server": "bun run --filter server dev",
     "dev:client": "bun run --filter client dev",
     "build": "bun run --filter '*' build",
+    "start": "bun run --filter server start",
     "db:migrate": "bun run --filter server db:migrate",
     "db:seed": "bun run --filter server db:seed",
     "db:studio": "bun run --filter server db:studio",
     "db:test:prepare": "DATABASE_URL=\"postgresql://postgres:postgres@localhost:5432/helpdesk_test?schema=public\" bun run --filter server db:push && DATABASE_URL=\"postgresql://postgres:postgres@localhost:5432/helpdesk_test?schema=public\" bun run --filter server db:seed",
     "test:e2e": "bun run db:test:prepare && playwright test",
     "test:e2e:ui": "bun run db:test:prepare && playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:unit": "bun run --filter client test"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1"
