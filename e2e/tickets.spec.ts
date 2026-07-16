@@ -15,12 +15,20 @@ test.describe('Ticket Management & Lifecycle', () => {
 
     await expect(page.getByRole('heading', { name: 'Support Tickets' })).toBeVisible();
 
+    // Use search to find the sample seeded ticket and avoid race conditions with other parallel tests
+    const searchInput = page.getByPlaceholder('Search tickets by subject or sender...');
+    await searchInput.fill('Cannot access my course materials');
+    await searchInput.press('Enter');
+
     // Check that sample seeded ticket is present
     await expect(page.getByText('Cannot access my course materials')).toBeVisible();
 
     // Test status filtering
     const statusSelect = page.locator('select').nth(0);
     await statusSelect.selectOption('RESOLVED');
+    // Search for resolved ticket
+    await searchInput.fill('How do I get a certificate?');
+    await searchInput.press('Enter');
     await expect(page.getByText('How do I get a certificate?')).toBeVisible();
   });
 
@@ -63,8 +71,8 @@ test.describe('Ticket Management & Lifecycle', () => {
     await page.getByPlaceholder('Describe the issue in detail…').fill('Need help with account settings.');
     await page.getByRole('button', { name: 'Create Ticket' }).click();
 
-    // Should navigate to ticket detail page
-    await page.waitForURL(/\/tickets\/.+/);
+    // Should navigate to ticket detail page (ensure it's not the /tickets/new page)
+    await page.waitForURL(/\/tickets\/(?!new$)[^/]+/);
 
     // Get the textarea and type a draft response
     const textarea = page.getByPlaceholder('Write your reply to the customer...');
@@ -104,15 +112,15 @@ test.describe('Ticket Management & Lifecycle', () => {
     await page.getByPlaceholder('Describe the issue in detail…').fill('We have an issue with downloading invoices.');
     await page.getByRole('button', { name: 'Create Ticket' }).click();
 
-    // Should navigate to ticket detail page
-    await page.waitForURL(/\/tickets\/.+/);
+    // Should navigate to ticket detail page (ensure it's not the /tickets/new page)
+    await page.waitForURL(/\/tickets\/(?!new$)[^/]+/);
 
     // Click the Summarize button
     await page.getByRole('button', { name: /Summarize Ticket/i }).click();
 
     // Verify that the AI Summary card appears
     await expect(page.getByText('AI Summary')).toBeVisible();
-    await expect(page.locator('div:has-text("AI Summary")').locator('p')).toContainText('We have an issue with downloading invoices');
+    await expect(page.locator('#ai-summary-text')).toContainText('We have an issue with downloading invoices');
   });
 
   test('automatically classifies a new ticket in background using AI', async ({ page }) => {
@@ -131,16 +139,21 @@ test.describe('Ticket Management & Lifecycle', () => {
 
     await page.getByRole('button', { name: 'Create Ticket' }).click();
 
-    // Should navigate to ticket detail page
-    await page.waitForURL(/\/tickets\/.+/);
+    // Should navigate to ticket detail page (ensure it's not the /tickets/new page)
+    await page.waitForURL(/\/tickets\/(?!new$)[^/]+/);
 
-    // Since classification runs in background, we wait and verify that category select gets auto-updated to REFUND_REQUEST and priority to HIGH
+    // Since classification runs in background, reload the page until the background worker has auto-updated the ticket category and priority
     const categorySelect = page.locator('select[aria-label="Category"]');
     const prioritySelect = page.locator('select[aria-label="Priority"]');
     
-    // Expect option with value REFUND_REQUEST to be selected eventually
-    await expect(categorySelect).toHaveValue('REFUND_REQUEST');
-    await expect(prioritySelect).toHaveValue('HIGH');
+    await expect(async () => {
+      await page.reload();
+      await expect(categorySelect).toHaveValue('REFUND_REQUEST');
+      await expect(prioritySelect).toHaveValue('HIGH');
+    }).toPass({
+      intervals: [1000, 2000],
+      timeout: 10000,
+    });
   });
 });
 

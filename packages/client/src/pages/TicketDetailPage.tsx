@@ -32,7 +32,7 @@ export function TicketDetailPage() {
 
   const loadAgents = async () => {
     try {
-      const data = await usersApi.list();
+      const data = await usersApi.list({ limit: "100" });
       setAgents(data.users.filter((u) => u.isActive));
     } catch {
       // Non-admin won't have access — that's OK

@@ -114,7 +114,7 @@ export function ReplyThread({ ticket, onReplySubmit }: ReplyThreadProps) {
                   <Sparkles className="w-4 h-4 text-primary" />
                   <span className="text-xs font-bold uppercase tracking-wider text-primary">AI Summary</span>
                 </div>
-                <p className="text-xs text-foreground leading-relaxed font-sans whitespace-pre-wrap">{summary}</p>
+                <p id="ai-summary-text" className="text-xs text-foreground leading-relaxed font-sans whitespace-pre-wrap">{summary}</p>
               </div>
             )}
           </div>

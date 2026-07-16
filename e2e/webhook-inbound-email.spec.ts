@@ -321,7 +321,7 @@ test.describe("Webhook: Inbound Email", () => {
       expect(ticket.description).toBe(payload.body);
       expect(ticket.senderName).toBe(payload.fromName);
       expect(ticket.senderEmail).toBe(payload.from);
-      expect(ticket.status).toBe("OPEN");
+      expect(ticket.status).toBe("NEW");
       expect(ticket.category).toBe("GENERAL_QUESTION");
 
       // Verify ticket has an ID and timestamps

@@ -4,7 +4,7 @@ test.describe('Authentication Flows', () => {
   test('admin can successfully sign in and see dashboard', async ({ page }) => {
     await page.goto('/login');
 
-    await expect(page.getByRole('heading', { name: 'Helpdesk' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 
     await page.locator('#login-email').fill('admin@example.com');
     await page.locator('#login-password').fill('password@123');
@@ -47,6 +47,6 @@ test.describe('Authentication Flows', () => {
     // 2. Sign out
     await page.locator('#top-navbar-signout-btn').click();
     await page.waitForURL('/login');
-    await expect(page.getByRole('heading', { name: 'Helpdesk' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
   });
 });

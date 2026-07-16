@@ -14,7 +14,17 @@ test.describe('User Management & Agent Creation', () => {
     await page.goto('/users');
 
     await expect(page.getByRole('heading', { name: 'Team Members' })).toBeVisible();
+
+    const searchInput = page.getByPlaceholder('Search team members by name or email...');
+    
+    // Search for Sarah Johnson to ensure she is visible (avoiding pagination push by other test agents)
+    await searchInput.fill('Sarah Johnson');
+    await searchInput.press('Enter');
     await expect(page.getByText('Sarah Johnson')).toBeVisible();
+
+    // Search for Mike Chen
+    await searchInput.fill('Mike Chen');
+    await searchInput.press('Enter');
     await expect(page.getByText('Mike Chen')).toBeVisible();
   });
 
@@ -65,6 +75,12 @@ test.describe('User Management & Agent Creation', () => {
 
     // 2. Go to Users management and deactivate Mike Chen
     await page.goto('/users');
+    
+    // Search for Mike Chen to make sure he is on the first page
+    const searchInput = page.getByPlaceholder('Search team members by name or email...');
+    await searchInput.fill('Mike Chen');
+    await searchInput.press('Enter');
+    
     const mikeRow = page.locator('tr', { hasText: 'Mike Chen' });
     
     // Intercept and accept the deactivation confirm dialog
@@ -84,6 +100,12 @@ test.describe('User Management & Agent Creation', () => {
 
     // Cleanup: Reactivate Mike Chen for subsequent tests
     await page.goto('/users');
+    
+    // Search for Mike Chen to reactivate
+    const searchInputCleanup = page.getByPlaceholder('Search team members by name or email...');
+    await searchInputCleanup.fill('Mike Chen');
+    await searchInputCleanup.press('Enter');
+    
     await mikeRow.getByRole('button', { name: 'Reactivate' }).click();
     await expect(mikeRow.getByRole('button', { name: 'Deactivate' })).toBeVisible({ timeout: 5000 });
   });

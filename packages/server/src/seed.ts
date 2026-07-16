@@ -245,7 +245,53 @@ async function main() {
     "I did not receive any notification that my subscription was about to renew. Please cancel the renewal and refund the charge."
   ];
 
-  const ticketDataList = [];
+  const ticketDataList = [
+    {
+      subject: "Cannot access my course materials",
+      description:
+        "I purchased the Advanced JavaScript course last week but I still cannot access the materials. My account shows the purchase but the course page says 'Not enrolled'.",
+      status: TicketStatus.OPEN,
+      category: TicketCategory.TECHNICAL_QUESTION,
+      priority: TicketPriority.HIGH,
+      senderName: "John Doe",
+      senderEmail: "john.doe@example.com",
+      assignedToId: agent1.id,
+    },
+    {
+      subject: "Request for refund - Wrong course purchased",
+      description:
+        "I accidentally purchased the Python Basics course instead of the Python Advanced course. I would like a refund so I can purchase the correct one.",
+      status: TicketStatus.OPEN,
+      category: TicketCategory.REFUND_REQUEST,
+      priority: TicketPriority.MEDIUM,
+      senderName: "Jane Smith",
+      senderEmail: "jane.smith@example.com",
+      assignedToId: agent2.id,
+    },
+    {
+      subject: "How do I get a certificate?",
+      description:
+        "I have completed the React Fundamentals course. How do I download or access my certificate of completion?",
+      status: TicketStatus.RESOLVED,
+      category: TicketCategory.GENERAL_QUESTION,
+      priority: TicketPriority.LOW,
+      senderName: "Alice Brown",
+      senderEmail: "alice.brown@example.com",
+      assignedToId: agent1.id,
+      resolvedAt: new Date(),
+    },
+    {
+      subject: "Video player not loading on mobile",
+      description:
+        "The video player does not load on my iPhone when I try to watch course videos. I am using Safari on iOS 17. The page just shows a blank white area where the video should be.",
+      status: TicketStatus.OPEN,
+      category: TicketCategory.TECHNICAL_QUESTION,
+      priority: TicketPriority.URGENT,
+      senderName: "Bob Wilson",
+      senderEmail: "bob.wilson@example.com",
+    }
+  ];
+
   for (let i = 1; i <= 100; i++) {
     let category: TicketCategory;
     let subject: string;
@@ -320,12 +366,31 @@ async function main() {
     const created = await prisma.ticket.create({ data: t });
     createdTickets.push(created);
   }
-  console.log(`  ✅ Created ${createdTickets.length} real world support tickets`);
+  console.log(`  ✅ Created ${createdTickets.length} support tickets`);
 
-  // Create sample comments for some of the tickets
-  for (let i = 0; i < 15; i++) {
+  // Create specific comments for the first ticket (Cannot access my course materials)
+  await prisma.comment.create({
+    data: {
+      body: "Hi John, I can see the issue on your account. Let me escalate this to our technical team. In the meantime, could you try logging out and back in?",
+      ticketId: createdTickets[0].id,
+      authorId: agent1.id,
+    },
+  });
+
+  await prisma.comment.create({
+    data: {
+      body: "Based on the ticket details, this appears to be an enrollment sync issue. The student's payment was processed but the enrollment record was not created in the LMS.",
+      ticketId: createdTickets[0].id,
+      authorId: agent1.id,
+      isInternal: true,
+      isAiGenerated: true,
+    },
+  });
+
+  // Create sample comments for some of the other tickets
+  for (let i = 1; i < 15; i++) {
     const ticket = createdTickets[i * 6];
-    if (ticket.assignedToId) {
+    if (ticket && ticket.assignedToId) {
       await prisma.comment.create({
         data: {
           body: `Hi ${ticket.senderName}, we are currently looking into your request. We'll update you as soon as possible.`,
