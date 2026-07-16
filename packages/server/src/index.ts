@@ -1,5 +1,4 @@
-import dotenv from "dotenv";
-dotenv.config();
+import "./lib/env.js";
 
 // Sentry must be initialized before all other imports
 import { initSentry, Sentry } from "./lib/sentry.js";

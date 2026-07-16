@@ -1,9 +1,7 @@
+import "./lib/env.js";
 import { PrismaClient, Role, TicketStatus, TicketCategory, TicketPriority } from "@prisma/client";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const prisma = new PrismaClient();
 
